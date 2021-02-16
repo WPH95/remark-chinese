@@ -1,3 +1,6 @@
+import {Node} from "unist";
+import {PunctuationNode} from "./node";
+
 export enum PUNCTUATION {
   STOP,
   COMMA,
@@ -19,13 +22,20 @@ export enum PUNCTUATION {
   UNKNOWN
 }
 
-const pMAP={}
+export interface PUNCTUATION_META {
+  name: PUNCTUATION,
+  isFull: boolean,
+  isCN: boolean,
+  alias: string,
+}
+const pMAP:Record<string, PUNCTUATION_META> = {}
 
-function createP(name, v, isFull=false, ensureCN=false, alias=""){
+function createP(name: PUNCTUATION, v: string, isFull = false, ensureCN = false, alias = "") {
   pMAP[v] = {
     name,
     isFull,
-    isCN: ensureCN || isFull
+    isCN: ensureCN || isFull,
+    alias
   }
 }
 
@@ -41,10 +51,10 @@ createP(PUNCTUATION.DOUBLE_QUOTATION_MARK, '"', false)
 createP(PUNCTUATION.SINGLE_QUOTATION_MARK, "'", false)
 
 
-createP(PUNCTUATION.HYPHEN, '–', false, true,"一字线")
+createP(PUNCTUATION.HYPHEN, '–', false, true, "一字线")
 createP(PUNCTUATION.HYPHEN, "-", false, false, "半字线")
-createP(PUNCTUATION.HYPHEN, "—", true, true,"短划线")
-createP(PUNCTUATION.HYPHEN, "——", true, true,"长横")
+createP(PUNCTUATION.HYPHEN, "—", true, true, "短划线")
+createP(PUNCTUATION.HYPHEN, "——", true, true, "长横")
 
 createP(PUNCTUATION.QUESTION, '?', false)
 createP(PUNCTUATION.QUESTION, "？", true)
@@ -69,15 +79,16 @@ createP(PUNCTUATION.RIGHT_PARENTHESIS, ')', false, true)
 createP(PUNCTUATION.RIGHT_PARENTHESIS, "）", true)
 
 
-
 createP(PUNCTUATION.ELLIPSIS, "...", false)
 createP(PUNCTUATION.ELLIPSIS, "......", false, true)
 
 createP(PUNCTUATION.LEFT_DOUBLE_QUOTATION_MARK, "“", true)
 createP(PUNCTUATION.RIGHT_DOUBLE_QUOTATION_MARK, "”", true)
 
-export const node2Punctuation = node => {
-  const meta = pMAP[node.value] || {name:PUNCTUATION.UNKNOWN}
+
+
+export const punctuationNodeSetMeta: (node: PunctuationNode) => void = node => {
+  const meta = pMAP[node.value] || {name: PUNCTUATION.UNKNOWN}
   node.ptype = meta.name
   node.isFull = meta.isFull
   node.isCN = meta.isCN
@@ -85,29 +96,31 @@ export const node2Punctuation = node => {
 };
 
 
-export const isComma = (node)=>{
+export const isComma: NodeCheckFunc = (node) => {
   return node.ptype === PUNCTUATION.COMMA
 }
 
-export const isHyphen= (node)=>{
+export const isHyphen: NodeCheckFunc = (node) => {
   return node.ptype === PUNCTUATION.HYPHEN
 }
-export const isSlash= (node)=>{
+export const isSlash: NodeCheckFunc = (node) => {
   return node.ptype === PUNCTUATION.SLASH
 }
-export const isPause = (node)=>{
+export const isPause: NodeCheckFunc = (node) => {
   return node.ptype === PUNCTUATION.PAUSE
 }
 
-export const isCnCOLON = (node)=>{
+export const isCnCOLON: NodeCheckFunc = (node) => {
   return node.ptype === PUNCTUATION.COLON && node.isCN === true
 }
 
-export const isLeftParenthesis = (node)=>{
+export const isLeftParenthesis: NodeCheckFunc = (node) => {
   return node.ptype === PUNCTUATION.LEFT_PARENTHESIS
 }
 
 
-export const isRightParenthesis = (node)=>{
+export const isRightParenthesis: NodeCheckFunc = (node) => {
   return node.ptype === PUNCTUATION.RIGHT_PARENTHESIS
 }
+
+type NodeCheckFunc = (node: Node) => boolean;
