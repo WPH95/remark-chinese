@@ -4,106 +4,111 @@ import stringWidth from "string-width";
 import {Node, Parent} from "unist";
 import {isHyphen, punctuationNodeSetMeta} from "./punctuation";
 
+const Parser = require("parse-english");
+const modifyChildren = require("unist-util-modify-children");
+
 const visit = require("unist-util-visit");
 const toString = require("nlcst-to-string");
-const English = require("parse-english");
-
 const NEWLINE_CHARS = "。！？";
 
-function createNewSentence(children: Node[]): Parent {
-  const start = children[0];
-  const end = children[children.length - 1];
-  return {
-    type: "SentenceNode",
-    children: children,
-    position: (start.position && end.position) ? {
-      start: start.position.start,
-      end: end.position.end
-    } : undefined,
-  };
+// @ts-ignore
+function ParseChinese(doc, file) {
+
+  // @ts-ignore
+  if (!(this instanceof ParseChinese)) {
+    // @ts-ignore
+    return new ParseChinese(doc, file);
+  }
+  // @ts-ignore
+  Parser.apply(this, arguments);
 }
 
+module.exports = ParseChinese;
 
-export class ChineseParser {
-  private parser: { parse: (text: string) => Root };
+ParserPrototype.prototype = Parser.prototype;
 
-  constructor() {
-    this.parser = new English();
-  }
+function ParserPrototype() {
+}
 
-  parse(text: string): Root {
-    const tree = this.parser.parse(text);
-    visit(tree, NODE_TYPE.Paragraph, (parent: any) => {
-      let children = [];
-      for (let node of parent.children) {
-        if (node.type === NODE_TYPE.Sentence) {
-          let sentenceChildren = [];
+// @ts-ignore
 
-          for (let sentence_node of node.children) {
-            sentenceChildren.push(sentence_node);
-            // 中文换行
-            if (
-              sentence_node.type === NODE_TYPE.Punctuation &&
-              NEWLINE_CHARS.indexOf(sentence_node.value) > -1
-            ) {
-              children.push(createNewSentence(sentenceChildren));
-              sentenceChildren = [];
-            }
+let proto = new ParserPrototype();
 
-            if (sentence_node.type === NODE_TYPE.Word) {
-              const v = toString(sentence_node);
-              sentence_node.isFull = v.length !== stringWidth(v);
-            }
+ParseChinese.prototype = proto;
+
+proto.tokenizeRootPlugins = [
+  modifyChildren(addSentenceMeta)
+].concat(proto.tokenizeRootPlugins);
+
+function addSentenceMeta(tree: Root) {
+  visit(tree, NODE_TYPE.Paragraph, (parent: any) => {
+    let children = [];
+    for (let node of parent.children) {
+      if (node.type === NODE_TYPE.Sentence) {
+        let sentenceChildren = [];
+
+        for (let sentence_node of node.children) {
+          sentenceChildren.push(sentence_node);
+          // 中文换行
+          if (
+            sentence_node.type === NODE_TYPE.Punctuation &&
+            NEWLINE_CHARS.indexOf(sentence_node.value) > -1
+          ) {
+            children.push(createNewSentence(sentenceChildren));
+            sentenceChildren = [];
           }
-          if (sentenceChildren.length > 0) {
-            let sen = createNewSentence(sentenceChildren);
-            if (!isShortCode(sen)) {
-              children.push(createNewSentence(sentenceChildren));
-            }
+
+          if (sentence_node.type === NODE_TYPE.Word) {
+            const v = toString(sentence_node);
+            sentence_node.isFull = v.length !== stringWidth(v);
           }
-        } else {
-          children.push(node);
         }
+        if (sentenceChildren.length > 0) {
+          let sen = createNewSentence(sentenceChildren);
+          if (!isShortCode(sen)) {
+            children.push(createNewSentence(sentenceChildren));
+          }
+        }
+      } else {
+        children.push(node);
       }
-      parent.children = children;
-    });
+    }
+    parent.children = children;
+  });
 
-    visit(tree, "SentenceNode", (sentence: any) => {
-      sentence.isFull = false;
-      sentence.index = {punctuation: 0};
-      visit(sentence, ["TextNode", "PunctuationNode"], (node: any, i: number, parent: Parent) => {
-        if (node.type === "TextNode") {
-          node.isFull = node.value.length !== stringWidth(node.value);
-        } else if (node.type === "PunctuationNode") {
-          punctuationNodeSetMeta(node);
-          if (isHyphen(node) && !isStartOrEndInArray(i, parent.children)) {
-            const last = parent.children[i - 1];
-            const next = parent.children[i + 1];
-            if (isSymbol(last) && last.value === "<") {
-              last.value = "<-"
-              parent.children.splice(i, 1)
-            } else if (isSymbol(next) && next.value === ">") {
-              last.value = "->"
-              parent.children.splice(i, 1)
-            }
-
+  visit(tree, "SentenceNode", (sentence: any) => {
+    sentence.isFull = false;
+    sentence.index = {punctuation: 0};
+    visit(sentence, ["TextNode", "PunctuationNode"], (node: any, i: number, parent: Parent) => {
+      if (node.type === "TextNode") {
+        node.isFull = node.value.length !== stringWidth(node.value);
+      } else if (node.type === "PunctuationNode") {
+        punctuationNodeSetMeta(node);
+        if (isHyphen(node) && !isStartOrEndInArray(i, parent.children)) {
+          const last = parent.children[i - 1];
+          const next = parent.children[i + 1];
+          if (isSymbol(last) && last.value === "<") {
+            last.value = "<-"
+            parent.children.splice(i, 1)
+          } else if (isSymbol(next) && next.value === ">") {
+            last.value = "->"
+            parent.children.splice(i, 1)
           }
-        }
-      });
 
-      for (let node of sentence.children) {
-        if (node.type === NODE_TYPE.Word) {
-          sentence.isFull = node.isFull || sentence.isFull;
-        }
-
-        if (node.type === NODE_TYPE.Punctuation) {
-          sentence.index.punctuation += 1;
         }
       }
     });
 
-    return tree;
-  }
+    for (let node of sentence.children) {
+      if (node.type === NODE_TYPE.Word) {
+        sentence.isFull = node.isFull || sentence.isFull;
+      }
+
+      if (node.type === NODE_TYPE.Punctuation) {
+        sentence.index.punctuation += 1;
+      }
+    }
+  });
 }
 
 
@@ -128,3 +133,17 @@ function isShortCode(sen: Parent) {
 export const isStartOrEndInArray = (i: number, children: Node[]) => {
   return i === 0 || children.length - 1 === i;
 };
+
+
+function createNewSentence(children: Node[]): Parent {
+  const start = children[0];
+  const end = children[children.length - 1];
+  return {
+    type: "SentenceNode",
+    children: children,
+    position: (start.position && end.position) ? {
+      start: start.position.start,
+      end: end.position.end
+    } : undefined,
+  };
+}

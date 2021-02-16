@@ -123,4 +123,4 @@ export const isRightParenthesis: NodeCheckFunc = (node) => {
   return node.ptype === PUNCTUATION.RIGHT_PARENTHESIS
 }
 
-type NodeCheckFunc = (node: Node) => boolean;
+export type NodeCheckFunc = (node: Node) => boolean;

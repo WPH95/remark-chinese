@@ -13,5 +13,13 @@ export {
 } from "./punctuation"
 
 export * as NODE_TYPE from "./node"
-export {ChineseParser} from "./parser";
-export {ChineseParser as Chinese} from "./parser";
+const  Chinese = require("./parser");
+const unherit = require('unherit')
+
+module.exports = parse
+parse.Parser = Chinese
+
+function parse() {
+  // @ts-ignore
+  this.Parser = unherit(Chinese)
+}
